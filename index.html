@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playfair Cipher — CS 320</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --parchment:#f5f0e8; --parchment2:#ede7d9; --parchment3:#e2d9c8;
+  --ink:#1c1a17; --ink-mid:#3d3828; --ink-light:#7a7260; --ink-faint:#b5ad9d;
+  --red:#8b2635; --gold:#9a7b2f; --navy:#1e3050; --navy-light:#2c4570;
+  --border:#cec5b0; --border-dark:#a89d88;
+  --serif:'Playfair Display',Georgia,serif;
+  --body:'EB Garamond',Georgia,serif;
+  --mono:'Courier Prime','Courier New',monospace;
+}
+html { scroll-behavior:smooth; }
+body {
+  background:var(--parchment); color:var(--ink);
+  font-family:var(--body); font-size:16px; line-height:1.6;
+  min-height:100vh; position:relative; overflow-x:hidden;
+}
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  opacity:.7;
+}
+body::after {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background-image:repeating-linear-gradient(to bottom,transparent 0,transparent 31px,rgba(160,150,130,.12) 31px,rgba(160,150,130,.12) 32px);
+}
+.wrapper { position:relative; z-index:1; max-width:1080px; margin:0 auto; padding:48px 28px 80px; }
+
+/* HEADER */
+header { text-align:center; margin-bottom:52px; animation:rise .8s ease both; }
+.h-rule { display:flex; align-items:center; gap:18px; margin-bottom:28px; }
+.h-rule::before,.h-rule::after { content:''; flex:1; height:1px; background:linear-gradient(to right,transparent,var(--border-dark),transparent); }
+.h-orn { font-size:20px; color:var(--gold); line-height:1; }
+.badge {
+  display:inline-block; border:1px solid var(--border-dark); color:var(--ink-light);
+  font-family:var(--mono); font-size:10px; letter-spacing:3px; text-transform:uppercase;
+  padding:5px 18px; margin-bottom:20px; background:var(--parchment2);
+}
+h1 { font-family:var(--serif); font-size:clamp(2.2rem,5.5vw,3.8rem); font-weight:700; color:var(--ink); line-height:1.1; margin-bottom:8px; }
+h1 em { font-style:italic; color:var(--red); }
+.h-sub { font-family:var(--body); font-style:italic; color:var(--ink-light); font-size:1rem; margin-bottom:6px; }
+.h-meta { font-family:var(--mono); font-size:11px; letter-spacing:2px; color:var(--ink-faint); text-transform:uppercase; }
+.f-rule { display:flex; align-items:center; gap:18px; margin-top:24px; }
+.f-rule::before,.f-rule::after { content:''; flex:1; height:1px; background:linear-gradient(to right,transparent,var(--border-dark),transparent); }
+
+/* LAYOUT */
+.main-grid { display:grid; grid-template-columns:1fr 1fr; gap:26px; margin-bottom:26px; }
+@media(max-width:720px){ .main-grid{grid-template-columns:1fr;} }
+
+/* CARD */
+.card {
+  background:var(--parchment2); border:1px solid var(--border); border-radius:2px;
+  padding:28px 26px; position:relative; animation:rise .7s ease both;
+  box-shadow:2px 3px 14px rgba(0,0,0,.07),inset 0 1px 0 rgba(255,255,255,.55);
+}
+.card::before {
+  content:''; position:absolute; top:4px; left:4px; right:4px; bottom:4px;
+  border:1px solid var(--border); pointer-events:none; opacity:.45; border-radius:1px;
+}
+.card:nth-child(2){animation-delay:.1s;}
+.card-title {
+  font-family:var(--serif); font-size:.76rem; font-weight:600; letter-spacing:3px;
+  text-transform:uppercase; color:var(--ink-light); margin-bottom:20px;
+  display:flex; align-items:center; gap:12px;
+}
+.card-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* MODE */
+.mode-row { display:flex; border:1px solid var(--border-dark); overflow:hidden; margin-bottom:22px; border-radius:1px; }
+.mode-btn {
+  flex:1; padding:9px 12px; background:transparent; border:none;
+  font-family:var(--mono); font-size:11px; letter-spacing:2px; text-transform:uppercase;
+  color:var(--ink-light); cursor:pointer; transition:all .22s;
+}
+.mode-btn+.mode-btn { border-left:1px solid var(--border-dark); }
+.mode-btn.active { background:var(--navy); color:var(--parchment); }
+
+/* FORM */
+.field { margin-bottom:16px; }
+.field label { display:block; font-family:var(--mono); font-size:10px; letter-spacing:2.5px; text-transform:uppercase; color:var(--ink-light); margin-bottom:7px; }
+.field input,.field textarea {
+  width:100%; background:var(--parchment); border:1px solid var(--border-dark);
+  border-radius:1px; color:var(--ink); font-family:var(--mono); font-size:14px;
+  padding:10px 13px; outline:none; resize:none; line-height:1.5;
+  transition:border-color .2s,box-shadow .2s;
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.06);
+}
+.field input:focus,.field textarea:focus {
+  border-color:var(--navy);
+  box-shadow:inset 0 1px 3px rgba(0,0,0,.06),0 0 0 3px rgba(30,48,80,.08);
+}
+.field input::placeholder,.field textarea::placeholder { color:var(--ink-faint); font-style:italic; }
+
+/* BUTTONS */
+.btn-row { display:flex; gap:10px; margin-top:2px; }
+.btn { cursor:pointer; border-radius:1px; font-family:var(--mono); font-size:11px; letter-spacing:2px; text-transform:uppercase; padding:10px 18px; transition:all .2s; border:1px solid; }
+.btn-run { flex:1; background:var(--navy); color:var(--parchment); border-color:var(--navy); }
+.btn-run:hover { background:var(--navy-light); border-color:var(--navy-light); transform:translateY(-1px); box-shadow:0 4px 14px rgba(30,48,80,.25); }
+.btn-clear { background:transparent; color:var(--ink-light); border-color:var(--border-dark); }
+.btn-clear:hover { background:var(--parchment3); color:var(--red); border-color:var(--red); }
+
+/* DIVIDER */
+.divider { display:flex; align-items:center; gap:10px; margin:20px 0 15px; color:var(--ink-faint); font-size:13px; }
+.divider::before,.divider::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* OUTPUT */
+.out-label { font-family:var(--mono); font-size:10px; letter-spacing:2.5px; text-transform:uppercase; color:var(--ink-light); margin-bottom:7px; }
+.out-box {
+  background:var(--parchment); border:1px solid var(--border-dark); border-radius:1px;
+  padding:13px 13px 30px; font-family:var(--mono); font-size:15px; letter-spacing:2px;
+  min-height:56px; word-break:break-all; line-height:1.7; color:var(--navy); font-weight:700;
+  position:relative; box-shadow:inset 0 1px 3px rgba(0,0,0,.05); transition:all .3s;
+}
+.out-box.empty { color:var(--ink-faint); font-weight:400; font-style:italic; font-family:var(--body); font-size:14px; letter-spacing:0; }
+.out-box.error { color:var(--red); font-weight:400; letter-spacing:.5px; font-size:13px; }
+.copy-btn {
+  position:absolute; bottom:8px; right:8px; background:var(--parchment2);
+  color:var(--ink-light); border:1px solid var(--border); border-radius:1px;
+  padding:3px 10px; font-size:9px; font-family:var(--mono); letter-spacing:1px;
+  text-transform:uppercase; cursor:pointer; transition:all .2s;
+}
+.copy-btn:hover { background:var(--navy); color:var(--parchment); border-color:var(--navy); }
+.prep-note { font-family:var(--body); font-style:italic; font-size:12px; color:var(--ink-faint); margin-top:9px; }
+
+/* GRID */
+.grid-wrap { display:grid; grid-template-columns:repeat(5,1fr); gap:5px; margin-top:4px; }
+.gc {
+  aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+  background:var(--parchment); border:1px solid var(--border);
+  font-family:var(--serif); font-size:clamp(14px,2.2vw,22px); font-weight:600; color:var(--ink);
+  transition:all .22s; cursor:default;
+}
+.gc:hover { background:var(--parchment3); border-color:var(--border-dark); }
+.gc.kw-letter { background:var(--navy); color:var(--parchment); border-color:var(--navy); }
+.gc.empty-gc  { color:var(--ink-faint); font-size:11px; font-family:var(--mono); font-weight:400; }
+.grid-legend { display:flex; gap:16px; margin-top:13px; flex-wrap:wrap; }
+.leg { display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-light); }
+.leg-dot { width:12px; height:12px; border:1px solid var(--border-dark); border-radius:1px; flex-shrink:0; }
+.leg-dot.kw { background:var(--navy); border-color:var(--navy); }
+.grid-note { margin-top:13px; font-family:var(--body); font-style:italic; font-size:12.5px; color:var(--ink-light); line-height:1.6; border-left:2px solid var(--border-dark); padding-left:12px; }
+
+/* STEPS */
+.steps-card { animation-delay:.2s; }
+.steps-scroll { max-height:300px; overflow-y:auto; padding-right:4px; }
+.steps-scroll::-webkit-scrollbar { width:4px; }
+.steps-scroll::-webkit-scrollbar-track { background:var(--parchment); }
+.steps-scroll::-webkit-scrollbar-thumb { background:var(--border-dark); border-radius:2px; }
+.steps-tbl { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:12px; }
+.steps-tbl thead th { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--ink-light); padding:6px 10px; border-bottom:1px solid var(--border-dark); text-align:left; background:var(--parchment3); }
+.steps-tbl tbody tr:hover td { background:var(--parchment3); }
+.steps-tbl td { padding:7px 10px; border-bottom:1px solid var(--border); color:var(--ink-mid); vertical-align:middle; }
+.steps-tbl td.pi { color:var(--navy); font-weight:700; letter-spacing:3px; }
+.steps-tbl td.po { color:var(--red);  font-weight:700; letter-spacing:3px; }
+.steps-tbl td.rl { color:var(--ink-faint); font-size:11px; }
+.steps-tbl td.rl em { color:var(--gold); font-style:normal; font-weight:700; }
+.steps-empty { font-family:var(--body); font-style:italic; color:var(--ink-faint); font-size:14px; }
+
+/* FOOTER */
+footer { text-align:center; margin-top:56px; animation:rise .7s .3s ease both; }
+.foot-txt { font-family:var(--body); font-style:italic; color:var(--ink-faint); font-size:13px; margin-top:16px; }
+
+/* ANIMATIONS */
+@keyframes rise { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+@keyframes flash { 0%,100%{box-shadow:inset 0 1px 3px rgba(0,0,0,.05)} 50%{box-shadow:0 0 0 3px rgba(30,48,80,.15)} }
+.flash { animation:flash .4s ease; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+<header>
+  <div class="h-rule"><div class="h-orn">✦</div></div>
+  <div class="badge">King Faisal University &nbsp;·&nbsp; CS 320 &nbsp;·&nbsp; Computer Security</div>
+  <h1>The <em>Playfair</em> Cipher</h1>
+  <p class="h-sub">An Interactive Encryption &amp; Decryption System</p>
+  <p class="h-meta">Invented by Charles Wheatstone, 1854</p>
+  <div class="f-rule"><div class="h-orn" style="font-size:13px;color:var(--ink-faint)">◆</div></div>
+</header>
+
+<div class="main-grid">
+
+  <!-- CIPHER PANEL -->
+  <div class="card">
+    <div class="card-title">Cipher Engine</div>
+    <div class="mode-row">
+      <button class="mode-btn active" id="encBtn" onclick="setMode('encrypt')">⇒ Encrypt</button>
+      <button class="mode-btn" id="decBtn" onclick="setMode('decrypt')">⇐ Decrypt</button>
+    </div>
+    <div class="field">
+      <label>Keyword</label>
+      <input type="text" id="keyInput" placeholder="e.g. MONARCHY" oninput="onKey()" maxlength="25" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label id="inputLabel">Plaintext</label>
+      <textarea id="textInput" rows="4" placeholder="Enter the message to encrypt…" oninput="clearOut()" autocomplete="off" spellcheck="false"></textarea>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-run" onclick="run()">Run Cipher</button>
+      <button class="btn btn-clear" onclick="clearAll()">Clear</button>
+    </div>
+    <div class="divider">✦</div>
+    <div class="out-label" id="outputLabel">Ciphertext</div>
+    <div class="out-box empty" id="output">
+      Output will appear here…
+      <button class="copy-btn" onclick="copyOut()">Copy</button>
+    </div>
+    <p class="prep-note" id="prepNote"></p>
+  </div>
+
+  <!-- KEY GRID -->
+  <div class="card">
+    <div class="card-title">5 × 5 Key Grid</div>
+    <div class="grid-wrap" id="keyGrid"></div>
+    <div class="grid-legend">
+      <div class="leg"><div class="leg-dot kw"></div>Keyword letters</div>
+      <div class="leg"><div class="leg-dot"></div>Remaining alphabet</div>
+    </div>
+    <p class="grid-note">I and J share one cell. The keyword fills positions first (duplicates removed), then remaining letters follow in alphabetical order.</p>
+  </div>
+
+</div>
+
+<!-- STEPS -->
+<div class="card steps-card">
+  <div class="card-title">Digraph Breakdown</div>
+  <div id="stepsWrap"><p class="steps-empty">Run the cipher to see each letter-pair transformation.</p></div>
+</div>
+
+<footer>
+  <div class="f-rule"><div class="h-orn" style="font-size:13px;color:var(--ink-faint)">◆</div></div>
+  <p class="foot-txt">Iqbal Bader Aldulami &nbsp;·&nbsp; Sarah Suliman Alkhateeb &nbsp;·&nbsp; Spring 2026</p>
+</footer>
+
+</div>
+<script>
+let mode='encrypt';
+
+function buildGrid(kw){
+  kw=kw.toUpperCase().replace(/J/g,'I').replace(/[^A-Z]/g,'');
+  const seen=new Set(),g=[];
+  for(const c of kw) if(!seen.has(c)){seen.add(c);g.push(c);}
+  for(let i=65;i<=90;i++){const c=String.fromCharCode(i);if(c==='J')continue;if(!seen.has(c)){seen.add(c);g.push(c);}}
+  return g;
+}
+function pos(g,c){const i=g.indexOf(c);return{r:Math.floor(i/5),c:i%5};}
+function prepText(t){
+  t=t.toUpperCase().replace(/J/g,'I').replace(/[^A-Z]/g,'');
+  let s='',i=0;
+  while(i<t.length){s+=t[i];if(i+1<t.length&&t[i]===t[i+1]){s+='X';i++;continue;}i++;}
+  if(s.length%2!==0)s+='X';
+  return s;
+}
+function cipherPair(g,a,b,dir){
+  const pa=pos(g,a),pb=pos(g,b);
+  if(pa.r===pb.r) return[g[pa.r*5+(pa.c+5+dir)%5],g[pb.r*5+(pb.c+5+dir)%5],'row'];
+  if(pa.c===pb.c) return[g[((pa.r+5+dir)%5)*5+pa.c],g[((pb.r+5+dir)%5)*5+pb.c],'col'];
+  return[g[pa.r*5+pb.c],g[pb.r*5+pa.c],'rect'];
+}
+// Remove Playfair padding X's from decrypted output:
+// 1. X between two identical letters (e.g. SU X UX → SUUX → SUU) was inserted to separate them
+// 2. Trailing X that was appended to make even length
+function cleanDecrypted(txt) {
+  let result = '';
+  for (let i = 0; i < txt.length; i++) {
+    // If current char is X, check if it's a padding X:
+    // Case 1: X sits between two identical letters → it was inserted padding, skip it
+    if (txt[i] === 'X' && i > 0 && i < txt.length - 1 && txt[i-1] === txt[i+1]) {
+      continue;
+    }
+    // Case 2: X is the very last character → it was appended to make even length, skip it
+    if (txt[i] === 'X' && i === txt.length - 1) {
+      continue;
+    }
+    result += txt[i];
+  }
+  return result;
+}
+
+function playfair(kw,txt,enc){
+  if(!kw.trim()) return{error:'Please enter a keyword.'};
+  if(!txt.trim()) return{error:'Please enter some text.'};
+  const g=buildGrid(kw);
+  const prep=enc?prepText(txt):txt.toUpperCase().replace(/J/g,'I').replace(/[^A-Z]/g,'');
+  if(!enc&&prep.length%2!==0) return{error:'Ciphertext must have an even number of letters.'};
+  const dir=enc?1:-1;
+  let out='';const steps=[];
+  for(let i=0;i<prep.length;i+=2){
+    const a=prep[i],b=prep[i+1];
+    const[oa,ob,rule]=cipherPair(g,a,b,dir);
+    out+=oa+ob;
+    const rl=rule==='row'?'Same <em>row</em> → shift right':rule==='col'?'Same <em>col</em> → shift down':'<em>Rectangle</em> → swap cols';
+    steps.push({in:a+b,out:oa+ob,rule:rl});
+  }
+  // For decryption, clean up padding X's to restore original text
+  const cleaned = enc ? out : cleanDecrypted(out);
+  return{out:cleaned,raw:out,steps,g,prep};
+}
+function setMode(m){
+  mode=m;
+  document.getElementById('encBtn').className='mode-btn'+(m==='encrypt'?' active':'');
+  document.getElementById('decBtn').className='mode-btn'+(m==='decrypt'?' active':'');
+  document.getElementById('inputLabel').textContent=m==='encrypt'?'Plaintext':'Ciphertext';
+  document.getElementById('outputLabel').textContent=m==='encrypt'?'Ciphertext':'Plaintext';
+  document.getElementById('textInput').placeholder=m==='encrypt'?'Enter the message to encrypt…':'Enter ciphertext to decrypt…';
+  clearOut();
+}
+function onKey(){
+  const kw=document.getElementById('keyInput').value;
+  renderGrid(buildGrid(kw),kw.toUpperCase().replace(/J/g,'I').replace(/[^A-Z]/g,''));
+}
+function run(){
+  const kw=document.getElementById('keyInput').value,txt=document.getElementById('textInput').value,enc=mode==='encrypt';
+  const res=playfair(kw,txt,enc);
+  const box=document.getElementById('output');
+  if(res.error){
+    box.className='out-box error';
+    box.innerHTML=res.error+'<button class="copy-btn" onclick="copyOut()">Copy</button>';
+    document.getElementById('prepNote').textContent='';
+    document.getElementById('stepsWrap').innerHTML='<p class="steps-empty">'+res.error+'</p>';
+    return;
+  }
+  box.className='out-box';
+  box.innerHTML=fmt(res.out)+'<button class="copy-btn" onclick="copyOut()">Copy</button>';
+  box.classList.add('flash');setTimeout(()=>box.classList.remove('flash'),400);
+  document.getElementById('prepNote').textContent=enc?'Prepared: '+res.prep+'  ('+res.prep.length/2+' digraphs)':'Raw decrypted: '+res.raw+(res.raw!==res.out?' → cleaned to: '+res.out:'');
+  renderGrid(res.g,document.getElementById('keyInput').value.toUpperCase().replace(/J/g,'I').replace(/[^A-Z]/g,''));
+  renderSteps(res.steps);
+}
+function fmt(t){return(t.match(/.{1,5}/g)||[]).join(' ');}
+function renderGrid(g,kw){
+  const el=document.getElementById('keyGrid'),kwSet=new Set(kw.split('').filter((c,i,a)=>a.indexOf(c)===i));
+  if(!g||g.length<25){el.innerHTML=Array.from({length:25},(_,i)=>`<div class="gc empty-gc">${String.fromCharCode(i<8?i+65:i+66)}</div>`).join('');return;}
+  el.innerHTML=g.map(ch=>`<div class="gc${kwSet.has(ch)?' kw-letter':''}">${ch}</div>`).join('');
+}
+function renderSteps(steps){
+  const w=document.getElementById('stepsWrap');
+  if(!steps||!steps.length){w.innerHTML='<p class="steps-empty">No steps to display.</p>';return;}
+  const rows=steps.map((s,i)=>`<tr><td style="color:var(--ink-faint);font-size:11px;width:32px">${String(i+1).padStart(2,'0')}</td><td class="pi">${s.in[0]} ${s.in[1]}</td><td style="color:var(--ink-faint);padding:0 6px">→</td><td class="po">${s.out[0]} ${s.out[1]}</td><td class="rl">${s.rule}</td></tr>`).join('');
+  w.innerHTML=`<div class="steps-scroll"><table class="steps-tbl"><thead><tr><th>#</th><th>Input Pair</th><th></th><th>Output Pair</th><th>Rule Applied</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function clearOut(){
+  const box=document.getElementById('output');
+  box.className='out-box empty';
+  box.innerHTML='Output will appear here…<button class="copy-btn" onclick="copyOut()">Copy</button>';
+  document.getElementById('prepNote').textContent='';
+}
+function clearAll(){
+  document.getElementById('keyInput').value='';document.getElementById('textInput').value='';
+  clearOut();renderGrid([],'');
+  document.getElementById('stepsWrap').innerHTML='<p class="steps-empty">Run the cipher to see each letter-pair transformation.</p>';
+}
+function copyOut(){
+  const box=document.getElementById('output'),txt=box.textContent.replace('Copy','').trim();
+  if(!txt||txt.includes('appear here'))return;
+  navigator.clipboard.writeText(txt);
+  const btn=box.querySelector('.copy-btn');btn.textContent='Copied';setTimeout(()=>btn.textContent='Copy',1800);
+}
+renderGrid(buildGrid(''),'');
+</script>
+</body>
+</html>
